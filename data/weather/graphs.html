@@ -1,0 +1,185 @@
+<!DOCTYPE html><html>
+<head>
+  <title>Kasra's Weather Station</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <style>
+    .topnav {
+      margin: 0px;
+      box-shadow: 0 5px 5px 0 rgba(0,0,0,.2);
+      background-color: #333;
+      overflow: hidden;
+    }
+    .topnav a {
+      float: left;
+      color: #f2f2f2;
+      text-align: center;
+      padding: 14px 16px;
+      text-decoration: none;
+      font-size: 17px;
+    }
+    .topnav a:hover {
+      background-color: #ddd;
+      color: black;
+    }
+    .topnav a.active {
+      background-color: #04AA6D;
+      color: white;
+    }
+    .charts {
+      min-width: 310px;
+      max-width: 800px;
+      height: 400px;
+      margin: 0 auto;
+    }
+    body {
+      margin: 0;
+    }
+    h2 {
+      font-family: Arial;
+      font-size: 2.5rem;
+      text-align: center;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="topnav">
+    <a href="/">Monitor</a>
+    <a class = "active" href="/graphs">Graphs</a>
+    <a href="/webserial" target = _blank>Serial</a>
+    <a href="/update" target = _blank>Updater</a>
+  </div>
+  <h2>Kasra's Remote Weather Station</h2>
+  <p style = "text-align: center;">
+	Welcome to Kasra's Weather Station. <br />
+	This website displays the environmental data of Kasra's house every second. <br />
+  <div class = "charts">
+    <div id="chart-temperature" class="container"></div>
+    <div id="chart-humidity" class="container"></div>
+    <div id="chart-pressure" class="container"></div>
+    <div id="chart-altitude" class="container"></div>
+  </div>
+</body>
+<script>
+var chartT = new Highcharts.Chart({
+  chart:{ renderTo : 'chart-temperature' },
+  title: { text: 'Temperature' },
+  series: [{
+    showInLegend: false,
+    data: []
+  }],
+  plotOptions: {
+    line: { animation: false,
+      dataLabels: { enabled: false }
+    },
+    series: { color: '#059e8a' }
+  },
+  xAxis: { type: 'datetime',
+    dateTimeLabelFormats: { second: '%H:%M:%S' }
+  },
+  yAxis: {
+    title: { text: 'Temperature (Fahrenheit)' }
+  },
+  credits: { enabled: false }
+});
+var chartH = new Highcharts.Chart({
+  chart:{ renderTo:'chart-humidity' },
+  title: { text: 'Humidity' },
+  series: [{
+    showInLegend: false,
+    data: []
+  }],
+  plotOptions: {
+    line: { animation: false,
+      dataLabels: { enabled: false }
+    }
+  },
+  xAxis: {
+    type: 'datetime',
+    dateTimeLabelFormats: { second: '%H:%M:%S' }
+  },
+  yAxis: {
+    title: { text: 'Humidity (%)' }
+  },
+  credits: { enabled: false }
+});
+var chartP = new Highcharts.Chart({
+  chart:{ renderTo:'chart-pressure' },
+  title: { text: 'Pressure' },
+  series: [{
+    showInLegend: false,
+    data: []
+  }],
+  plotOptions: {
+    line: { animation: false,
+      dataLabels: { enabled: false }
+    }
+  },
+  xAxis: {
+    type: 'datetime',
+    dateTimeLabelFormats: { second: '%H:%M:%S' }
+  },
+  yAxis: {
+    title: { text: 'Pressure (Pa)' }
+  },
+  credits: { enabled: false }
+});
+var chartA = new Highcharts.Chart({
+  chart:{ renderTo:'chart-altitude' },
+  title: { text: 'Altitude' },
+  series: [{
+    showInLegend: false,
+    data: []
+  }],
+  plotOptions: {
+    line: { animation: false,
+      dataLabels: { enabled: false }
+    }
+  },
+  xAxis: {
+    type: 'datetime',
+    dateTimeLabelFormats: { second: '%H:%M:%S' }
+  },
+  yAxis: {
+    title: { text: 'Altitude (ft)' }
+  },
+  credits: { enabled: false }
+});
+
+setInterval(function ( ) {
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (this.readyState === 4 && this.status === 200) {
+		
+		var x = (new Date()).getTime();
+		var responseArr = this.responseText.split( " " );
+        var yt = parseFloat(responseArr[0]);
+        var yh = parseFloat(responseArr[1]);
+        var yp = parseFloat(responseArr[2]);
+        var ya = parseFloat(responseArr[3]);
+		
+      if(chartT.series[0].data.length > 60) {
+        chartT.series[0].addPoint([x, yt], true, true, true);
+      } else {
+        chartT.series[0].addPoint([x, yt], true, false, true);
+      } if(chartH.series[0].data.length > 60) {
+        chartH.series[0].addPoint([x, yh], true, true, true);
+      } else {
+        chartH.series[0].addPoint([x, yh], true, false, true);
+      } if(chartP.series[0].data.length > 60) {
+        chartP.series[0].addPoint([x, yp], true, true, true);
+      } else {
+        chartP.series[0].addPoint([x, yp], true, false, true);
+      } if(chartA.series[0].data.length > 60) {
+        chartA.series[0].addPoint([x, ya], true, true, true);
+      } else {
+        chartA.series[0].addPoint([x, ya], true, false, true);
+      }
+    }
+  };
+  xhttp.open("GET", "/stats", true);
+  xhttp.send();
+}, 1000 ) ;
+</script>
+</html>

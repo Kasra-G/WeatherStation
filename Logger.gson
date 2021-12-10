@@ -1,0 +1,75 @@
+function doPost(e){
+    Logger.log("--- doPost ---");
+
+    var tag = "",
+        valueT = "";
+    valueH = "";
+    valueP = "";
+    valueA = "";
+
+    try {
+
+        if (e == null){e={}; e.parameters = {tag:"test",valueT:"-1",valueH:"-1", valueP:"-1", valueA:"-1"};}
+
+        tag = e.parameters.tag;
+        valueT = e.parameters.valueT;
+        valueH = e.parameters.valueH;
+        valueP = e.parameters.valueP;
+        valueA = e.parameters.valueA;
+        // save the data to spreadsheet
+        save_data(tag, valueT, valueH, valueP, valueA);
+
+
+        return ContentService.createTextOutput("Wrote:\n  tag: " + tag + "\n  valueT: " + valueT + "\nValueH" + valueH
+                + "\nValueP" + valueP
+                + "\nValueA" + valueA);
+
+    } catch(error) {
+        Logger.log(error);
+        return ContentService.createTextOutput("oops...." + error.message
+                + "\n" + new Date()
+                + "\ntag: " + tag +
+                + "\nvalueT: " + valueT +
+                + "\nValueH" + valueH
+                + "\nValueP" + valueP
+                + "\nValueA" + valueA);
+    }
+}
+
+// Method to save given data to a sheet
+function save_data(tag, valueT, valueH, valueP, valueA){
+    Logger.log("--- save_data ---");
+
+
+    try {
+        var date = new Date();
+
+        var ss = SpreadsheetApp.openByUrl("https://docs.google.com/spreadsheets/d/1eBKXJ9b70zjTSAYqrthpV_w1auMo2JRP1_ln0DGtQLo/edit");
+        var summarySheet = ss.getSheetByName("Summary");
+        var dataLoggerSheet = ss.getSheetByName("Logs");
+
+
+        // Get last edited row from DataLogger sheet
+        var row = dataLoggerSheet.getLastRow() + 1;
+
+
+        // Start Populating the data
+        dataLoggerSheet.getRange("A" + row).setValue(row -1); // ID
+        dataLoggerSheet.getRange("B" + row).setValue(date); // dateTime
+        dataLoggerSheet.getRange("C" + row).setValue(tag); // tag
+        dataLoggerSheet.getRange("D" + row).setValue(valueT); // value
+        dataLoggerSheet.getRange("E" + row).setValue(valueH); // value
+        dataLoggerSheet.getRange("F" + row).setValue(valueP); // value
+        dataLoggerSheet.getRange("G" + row).setValue(valueA); // value
+
+
+        // Update summary sheet
+        summarySheet.getRange("B1").setValue(date); // Last modified date
+    }
+
+    catch(error) {
+        Logger.log(JSON.stringify(error));
+    }
+
+    Logger.log("--- save_data end---");
+}
