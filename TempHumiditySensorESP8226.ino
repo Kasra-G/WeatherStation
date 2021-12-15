@@ -80,7 +80,7 @@ void postData(String tag, float valueT, float valueH, float valueP, float valueA
 //B = sea level pressure in hPa, P = pressure in Pa, T = temp in Farenheight
 //returns alt in feet
 float altFromPressure(double B, float P, float T) {
-  return (pow(B / (P / 100), 1 / 5.257) - 1) * ((T - 32) * 5 / 9 + 273.15) / .0065 * 3.28084;
+  return (pow(1 - P / B, 1 / 5.257)) * 44330 * 3.28084;
 }
 
 //update the raw and kalman estimated data
@@ -101,11 +101,12 @@ void updateData() {
   dataT = tKalman.updateEstimate(rdataT);
   dataH = hKalman.updateEstimate(rdataH);
   lastdataP = dataP;
+
   dataP = pKalman.updateEstimate(rdataP);
-  if (combA >= .99 && combA <= 1.01) {
+  if (combA >= .95 && combA <= 1.05) {
     if (runn && count > 10) {
       float A = initialAlt;
-      baseline = (dataP / 100) * pow(1 - .0065*A / ((dataT - 32) * 5 / 9 + .0065*A + 273.15), -5.257);
+      baseline = dataP * pow(1 - A/44330, -5.257);
       runn = false;
     } else {
       double ratio = ((double)dataP) / lastdataP;
@@ -113,11 +114,9 @@ void updateData() {
     }
   }
   dataA = altFromPressure(baseline, dataP, dataT);
-
+  
 //serial plotting
   if (plot) {
-    Serial.print("rdataA:");
-    Serial.print(rdataA);
     Serial.print(",dataA:");
     Serial.println(dataA);
   }
@@ -172,6 +171,8 @@ void setup(void) {
   Serial.begin(74880);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
+
+  dataA = 0;
 
   // Initialize SPIFFS
   if (!SPIFFS.begin()) {
