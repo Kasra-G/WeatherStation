@@ -2,14 +2,21 @@ function doPost(e){
     Logger.log("--- doPost ---");
 
     var tag = "",
-        valueT = "";
-    valueH = "";
-    valueP = "";
+        valueT = "",
+    valueH = "",
+    valueP = "",
     valueA = "";
 
     try {
-
-        if (e == null){e={}; e.parameters = {tag:"test",valueT:"-1",valueH:"-1", valueP:"-1", valueA:"-1"};}
+        if (e == null){
+            e={} e.parameters = {
+                tag:"test",
+                valueT:"-1",
+                valueH:"-1",
+                valueP:"-1",
+                valueA:"-1"
+            };
+        }
 
         tag = e.parameters.tag;
         valueT = e.parameters.valueT;

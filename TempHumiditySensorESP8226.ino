@@ -15,43 +15,45 @@
 #include "HTTPSRedirect.h"
 #include "Adafruit_Si7021.h"
 #include "Adafruit_BMP280.h"
+#include "SparkFunLSM6DSO.h"
 
-#define CITY "Marietta"
-#define STATE "Georgia"
-#define WEATHERKEY "680d20c5abcc24a2f56b6359b1b8ecb6"
+const float initialAlt = 997.0 / 3.28084;      //initial altitude in feet
+
+//#define CITY "Marietta"
+//#define STATE "Georgia"
+//#define WEATHERKEY "680d20c5abcc24a2f56b6359b1b8ecb6"
 
 const char* ssid = "HR-GH";
 const char* password = "SalamHamidAgha";
 const char* GScriptId = "AKfycbySwngijeWqIgPzFrUneADQOJieXu-HDXb7-2bc_ez-UjKYvptgh7vsP6N5edbF1mBvWg";
 const char* host = "script.google.com";
-String weatherURL = String("http://api.openweathermap.org/data/2.5/weather?q=") + CITY + "," + STATE + "&appid=" + WEATHERKEY;
+//String weatherURL = String("http://api.openweathermap.org/data/2.5/weather?q=") + CITY + "," + STATE + "&appid=" + WEATHERKEY;
 
 const int httpsPort = 443;
 String url = String("/macros/s/") + GScriptId + "/exec?";
 
-float dataT, dataH, dataP, dataA;
-float rdataT, rdataH, rdataP, rdataA;
-float baseline = 1017.15;
+float dataT, dataH, dataP, dataA, dataAc;
+float rdataT, rdataH, rdataP, lastdataP, rdataA, rdataAc;
+double baseline = 1013.15;       //average sea level pressure of the world
 const bool plot = false;
 bool stopFlag = false;
 
 void sendData();
 void updateData();
-void rebase();
 
 HTTPSRedirect gScriptClient(httpsPort);
 AsyncWebServer server(80);
 Adafruit_Si7021 si7021;
 Adafruit_BMP280 bmp280;
+LSM6DSO lsm6dso;
 TickTwo sender(sendData, 30000, 0, MILLIS);
 TickTwo updater(updateData, 20, 0, MILLIS);
-TickTwo baseliner(rebase, 5000, 0, MILLIS);
 
 //Kalman filters
 SimpleKalmanFilter tKalman(1, 1, 0.05);
 SimpleKalmanFilter hKalman(1, 1, 0.03);
 SimpleKalmanFilter pKalman(1, 1, 0.01);
-SimpleKalmanFilter aKalman(1, 1, 0.10);
+SimpleKalmanFilter accKalman(1, 1, 0.10);
 
 //Read temperature by average the barometer temperature and the hygrometer temperature
 float readTempFarenh() {
@@ -75,19 +77,43 @@ void postData(String tag, float valueT, float valueH, float valueP, float valueA
   gScriptClient.POST(url, host, payload);
 }
 
+//B = sea level pressure in hPa, P = pressure in Pa, T = temp in Farenheight
+//returns alt in feet
+float altFromPressure(double B, float P, float T) {
+  return (pow(B / (P / 100), 1 / 5.257) - 1) * ((T - 32) * 5 / 9 + 273.15) / .0065 * 3.28084;
+}
+
 //update the raw and kalman estimated data
 void updateData() {
+  static int count = 0;
+  static bool runn = true;
   rdataT = readTempFarenh();
   rdataH = si7021.readHumidity();
   rdataP = bmp280.readPressure();
-  rdataA = bmp280.readAltitude(baseline) * 3.28084;     //convert to feet
-
+  float x, y, z;
+  x = lsm6dso.readFloatAccelX();
+  y = lsm6dso.readFloatAccelY();
+  z = lsm6dso.readFloatAccelZ();
+  float comb = sqrt(x*x +  y*y + z*z);
+  
 //kalman filters
+  double combA = accKalman.updateEstimate(comb);
   dataT = tKalman.updateEstimate(rdataT);
   dataH = hKalman.updateEstimate(rdataH);
+  lastdataP = dataP;
   dataP = pKalman.updateEstimate(rdataP);
-  dataA = aKalman.updateEstimate(rdataA);
-  
+  if (combA >= .99 && combA <= 1.01) {
+    if (runn && count > 10) {
+      float A = initialAlt;
+      baseline = (dataP / 100) * pow(1 - .0065*A / ((dataT - 32) * 5 / 9 + .0065*A + 273.15), -5.257);
+      runn = false;
+    } else {
+      double ratio = ((double)dataP) / lastdataP;
+      baseline *= ratio;
+    }
+  }
+  dataA = altFromPressure(baseline, dataP, dataT);
+
 //serial plotting
   if (plot) {
     Serial.print("rdataA:");
@@ -95,31 +121,12 @@ void updateData() {
     Serial.print(",dataA:");
     Serial.println(dataA);
   }
+
+  count++;
 }
 
 void sendData() {
   postData("WeatherStationReadings", dataT, dataH, dataP, dataA);
-}
-
-void rebase() {
-  if (WiFi.status() == WL_CONNECTED) {
-    WiFiClient client;
-    HTTPClient http;
-    http.begin(client, weatherURL);
-    int code = http.GET();
-    if (code > 0) {
-      String response = http.getString();
-      if (code != 200) {
-        String errorMessage = "Error response (" + String(code) + "): " + response;
-        WebSerial.println(errorMessage);
-      } else {
-        StaticJsonDocument<768> doc;
-        DeserializationError error = deserializeJson(doc, response);
-        baseline = (float)(doc["main"]["pressure"]);
-      }
-    }
-    http.end();
-  }
 }
 
 String formatStats() {
@@ -148,15 +155,13 @@ void parseCommand(unsigned char* data, size_t len) {
     stopFlag = true;
     sender.pause();
     updater.pause();
-    baseliner.pause();
     WebSerial.println("Stopped Service");
   } else if (command.equals("resume") && stopFlag) {
     stopFlag = false;
     sender.resume();
     updater.resume();
-    baseliner.resume();
     WebSerial.println("Resumed Service");
-  } else if (command.equals("reboot") {
+  } else if (command.equals("reboot")) {
     WebSerial.println("Rebooting...");
     ESP.restart();
   }
@@ -241,15 +246,21 @@ void setup(void) {
     Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
                      "try a different address!"));
   }
-
+  if(lsm6dso.begin() )
+    Serial.println("Ready.");
+  else { 
+    Serial.println("Could not connect to IMU.");
+    Serial.println("Freezing");
+  }
+  if(lsm6dso.initialize(BASIC_SETTINGS) ) {
+    Serial.println("Loaded Settings.");
+  }
   sender.start();
   updater.start();
-  baseliner.start();
 }
 
 void loop(void) {
   AsyncElegantOTA.loop();
   sender.update();
   updater.update();
-  baseliner.update();
 }
