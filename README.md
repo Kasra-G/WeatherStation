@@ -1,4 +1,4 @@
-##Weather Station Project
+## Weather Station Project
 -- Kasra Ghaffari
 
 This repository contains all the code used in my Sensors Final Project.
