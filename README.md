@@ -9,3 +9,5 @@ TempHumiditySensorESP8226.ino: NodeMCU code written in the Arduino IDE
 
 data folder: all the HTML, CSS, and JavaScript code sent from the Microcontroller to the user's browser
 when an HTTP request is made
+
+Check out the website for yourself: http://eero.hrghaffari.com
